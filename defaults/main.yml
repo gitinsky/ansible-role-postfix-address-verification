@@ -1,0 +1,5 @@
+bounces_domain: {{ ansible_fqdn }}
+bounces_callback_domain: {{ ansible_fqdn }}
+etc_path: ''
+bounces_script_dest: "{{ etc_path }}/etc/postfix/bounces.sh"
+bounces_default_script_enabled: no

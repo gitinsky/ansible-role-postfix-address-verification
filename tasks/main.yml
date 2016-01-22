@@ -1,0 +1,42 @@
+- name: Generate postfix config files
+  template: src=transport.maps
+            dest={{ etc_path }}/etc/postfix/transport.maps
+            owner=root
+            group=root
+            mode=0644
+            backup=yes
+  register: transport_maps
+  notify:
+    - reload postfix
+
+- name: put required options to main.cf
+  lineinfile: regexp='^{{ item.key }}\s*=' line='{{ item.key }} = {{ item.value }}' insertafter=EOF backup=yes dest={{ etc_path }}/etc/postfix/main.cf
+  with_items:
+      - { key: maildrop_destination_recipient_limit, value: 1 }
+      - { key: virtual_transport, value: maildrop }
+      - { key: virtual_mailbox_domains, value: "{{ bounces_domain }}" }
+  notify:
+    - reload postfix
+
+- name: put maildrop options to master.cf
+  lineinfile: regexp='{{ item.r }}' line='{{ item.l }}' insertafter={{ item.a }} backup=yes dest={{ etc_path }}/etc/postfix/master.cf
+  with_items:
+      - { r: '^maildrop\s+', l: 'maildrop  unix  -       n       n       -       -       pipe', a: EOF }
+      - { r: '^\s+user=bounces', l: '  user=bounces argv={{ etc_path }}/etc/postfix/bounces.sh maildrop', a: '^maildrop\s+=' }
+  notify:
+    - reload postfix
+
+- name: postmap /etc/postfix/transport.maps
+  shell: postmap /etc/postfix/transport.maps
+  when: transport_maps.changed
+
+- name: create bounces user
+  user: name=bounces shell=/usr/sbin/nologin
+
+- name: put bounces.sh
+  template: src=bounces.sh
+            dest={{ bounces_script_dest }}
+            owner=bounces
+            group=bounces
+            mode=0744
+  when: bounces_default_script_enabled
